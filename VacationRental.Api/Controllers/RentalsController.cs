@@ -1,7 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
-using VacationRental.Api.Models;
+using System;
+using VacationRental.Api.IRepositories;
+using VacationRental.Api.Model;
+using VacationRental.Api.Resources;
 
 namespace VacationRental.Api.Controllers
 {
@@ -9,35 +11,63 @@ namespace VacationRental.Api.Controllers
     [ApiController]
     public class RentalsController : ControllerBase
     {
-        private readonly IDictionary<int, RentalViewModel> _rentals;
+        private readonly IMapper _mapper;
+        private readonly IRentalsRepository _rentalsRepository;
 
-        public RentalsController(IDictionary<int, RentalViewModel> rentals)
+        public RentalsController(IMapper mapper,
+                                 IRentalsRepository rentalsRepository)
         {
-            _rentals = rentals;
+            _mapper = mapper;
+            _rentalsRepository = rentalsRepository;
         }
 
         [HttpGet]
         [Route("{rentalId:int}")]
-        public RentalViewModel Get(int rentalId)
+        public IActionResult Get(int rentalId)
         {
-            if (!_rentals.ContainsKey(rentalId))
-                throw new ApplicationException("Rental not found");
-
-            return _rentals[rentalId];
+            try
+            {
+                var result = _rentalsRepository.GetRental(rentalId);
+                if(result == null)
+                    BadRequest("Rental not found");
+                return Ok(_mapper.Map<Rental, RentalOutputResource>(result));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
         }
 
         [HttpPost]
-        public ResourceIdViewModel Post(RentalBindingModel model)
+        public IActionResult Post(RentalInputResource model)
         {
-            var key = new ResourceIdViewModel { Id = _rentals.Keys.Count + 1 };
-
-            _rentals.Add(key.Id, new RentalViewModel
+            try
             {
-                Id = key.Id,
-                Units = model.Units
-            });
-
-            return key;
+                return Ok(_rentalsRepository.PostRental(model));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
         }
+
+
+        [HttpPut]
+        [Route("{rentalId:int}")]
+        public IActionResult Put(int rentalId, RentalInputResource model)
+        {
+            try
+            {
+                var result = _rentalsRepository.PutRental(rentalId, model);
+                if (result == null)
+                    return BadRequest("There are bookings that prevent the update of the parameters");
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex);
+            }
+        }
+
     }
 }
